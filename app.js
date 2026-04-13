@@ -1093,6 +1093,5 @@ if (state.currentUser) {
 render();
 
   startNotifInterval();
-}
 
 render();
