@@ -8,30 +8,32 @@
 // =========================================================
 
 const state = {
-  users:          JSON.parse(localStorage.getItem('tempo_users')        || '[]'),
-  currentUser:    JSON.parse(localStorage.getItem('tempo_current_user') || 'null'),
-  tasks:          [],
-  completed:      [],
-  view:           'dashboard',   // 'dashboard' | 'completed'
-  modal:          null,          // null | 'add' | 'edit'
-  editingTaskId:  null,
-  activeAuthTab:  'login',
+  users: JSON.parse(localStorage.getItem('tempo_users') || '[]'),
+  currentUser: JSON.parse(localStorage.getItem('tempo_current_user') || 'null'),
+  tasks: [],
+  completed: [],
+  view: 'dashboard',   // 'dashboard' | 'completed'
+  modal: null,          // null | 'add' | 'edit'
+  editingTaskId: null,
+  activeAuthTab: 'login',
   notifPanelOpen: false,
+  authView: 'login',       // 'login' | 'forgot' | 'reset' | 'forgot-sent'
+  resetToken: null,          // token for the current reset session
 };
 
 function loadUserData() {
   if (!state.currentUser) return;
-  const k  = `tempo_tasks_${state.currentUser.email}`;
+  const k = `tempo_tasks_${state.currentUser.email}`;
   const ck = `tempo_completed_${state.currentUser.email}`;
-  state.tasks     = JSON.parse(localStorage.getItem(k)  || '[]');
+  state.tasks = JSON.parse(localStorage.getItem(k) || '[]');
   state.completed = JSON.parse(localStorage.getItem(ck) || '[]');
 }
 
 function saveUserData() {
   if (!state.currentUser) return;
-  const k  = `tempo_tasks_${state.currentUser.email}`;
+  const k = `tempo_tasks_${state.currentUser.email}`;
   const ck = `tempo_completed_${state.currentUser.email}`;
-  localStorage.setItem(k,  JSON.stringify(state.tasks));
+  localStorage.setItem(k, JSON.stringify(state.tasks));
   localStorage.setItem(ck, JSON.stringify(state.completed));
 }
 
@@ -59,13 +61,13 @@ function diffDaysFromNow(deadline) {
 function getUrgencyScore(deadline) {
   const d = diffDaysFromNow(deadline);
   if (isNaN(d)) return 1;
-  if (d < 0)   return 10;   // Overdue
-  if (d < 1)   return 9;    // Due today
-  if (d < 2)   return 7;    // Due tomorrow
-  if (d < 3)   return 5;    // 2 days
-  if (d < 4)   return 3.5;  // 3 days
-  if (d < 7)   return 2.5;  // This week
-  if (d < 14)  return 1.5;  // Next week
+  if (d < 0) return 10;   // Overdue
+  if (d < 1) return 9;    // Due today
+  if (d < 2) return 7;    // Due tomorrow
+  if (d < 3) return 5;    // 2 days
+  if (d < 4) return 3.5;  // 3 days
+  if (d < 7) return 2.5;  // This week
+  if (d < 14) return 1.5;  // Next week
   return 1;                  // 2+ weeks
 }
 
@@ -88,15 +90,15 @@ function getDeadlineLabel(deadline) {
   const d = diffDaysFromNow(deadline);
   if (isNaN(d)) return 'No deadline';
   const days = Math.ceil(d);
-  if (days < 0)  return `${Math.abs(days)}d overdue`;
+  if (days < 0) return `${Math.abs(days)}d overdue`;
   if (days === 0) return 'Due today';
   if (days === 1) return 'Due tomorrow';
   return `Due in ${days} days`;
 }
 
 function getDoNextReason(task) {
-  const p    = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
-  const dl   = getDeadlineLabel(task.deadline);
+  const p = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
+  const dl = getDeadlineLabel(task.deadline);
   const days = diffDaysFromNow(task.deadline);
 
   if (days < 0) return `${p} priority · Overdue — needs immediate attention`;
@@ -120,7 +122,7 @@ function getNotifications() {
     .map(t => {
       const d = diffDaysFromNow(t.deadline);
       let type = null;
-      if (d < 0)      type = 'overdue';
+      if (d < 0) type = 'overdue';
       else if (d < 1) type = 'due-today';
       else if (d < 2) type = 'due-tomorrow';
       if (!type) return null;
@@ -131,8 +133,8 @@ function getNotifications() {
 }
 
 function getNotifLabel(type) {
-  if (type === 'overdue')      return 'Overdue — act now';
-  if (type === 'due-today')    return 'Due today';
+  if (type === 'overdue') return 'Overdue — act now';
+  if (type === 'due-today') return 'Due today';
   if (type === 'due-tomorrow') return 'Due tomorrow';
   return '';
 }
@@ -144,7 +146,7 @@ function sendBrowserNotif(task, type) {
   const pLabel = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
   new Notification(`Tempo: ${task.title}`, {
     body: `${label} · ${pLabel} priority`,
-    tag:  `tempo-${task.id}`,   // deduplicates OS-level notifications
+    tag: `tempo-${task.id}`,   // deduplicates OS-level notifications
   });
 }
 
@@ -170,7 +172,7 @@ function checkBrowserNotifications() {
 
   if (anyNew) {
     localStorage.setItem(storageKey, JSON.stringify(updated));
-    const overdue  = notifs.filter(n => n.notifType === 'overdue');
+    const overdue = notifs.filter(n => n.notifType === 'overdue');
     const dueToday = notifs.filter(n => n.notifType === 'due-today');
     if (overdue.length) {
       showToastVariant(
@@ -224,12 +226,12 @@ function closeNotifPanel() {
 function snoozeTask(taskId) {
   if (!state.currentUser) return;
   // Snooze: mark as notified for today AND tomorrow so it won't surface until 2 days from now
-  const todayKey  = new Date().toISOString().split('T')[0];
-  const tomorrow  = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayKey = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowKey = tomorrow.toISOString().split('T')[0];
-  const storageKey  = `tempo_notified_${state.currentUser.email}`;
-  const notified    = JSON.parse(localStorage.getItem(storageKey) || '{}');
-  notified[`${taskId}_${todayKey}`]   = true;
+  const storageKey = `tempo_notified_${state.currentUser.email}`;
+  const notified = JSON.parse(localStorage.getItem(storageKey) || '{}');
+  notified[`${taskId}_${todayKey}`] = true;
   notified[`${taskId}_${tomorrowKey}`] = true;
   localStorage.setItem(storageKey, JSON.stringify(notified));
   showToast('Snoozed until the day after tomorrow 😴');
@@ -255,6 +257,43 @@ function authLogin(email, password) {
   return user ? { user } : { error: 'Incorrect email or password.' };
 }
 
+// =========================================================
+// FORGOT / RESET PASSWORD
+// =========================================================
+
+function authForgotPassword(email) {
+  const user = state.users.find(u => u.email === email);
+  // We never reveal whether an account exists — always succeed silently.
+  if (user) {
+    // Generate a pseudo-random token and store it with the email + expiry (1 h)
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const expiry = Date.now() + 60 * 60 * 1000; // 1 hour
+    const resets = JSON.parse(localStorage.getItem('tempo_resets') || '{}');
+    resets[token] = { email, expiry };
+    localStorage.setItem('tempo_resets', JSON.stringify(resets));
+    state.resetToken = token;
+  }
+  return { ok: true };
+}
+
+function authResetPassword(token, newPassword) {
+  const resets = JSON.parse(localStorage.getItem('tempo_resets') || '{}');
+  const entry = resets[token];
+  if (!entry) return { error: 'Invalid or expired reset link. Please try again.' };
+  if (Date.now() > entry.expiry) {
+    delete resets[token];
+    localStorage.setItem('tempo_resets', JSON.stringify(resets));
+    return { error: 'This reset link has expired. Please request a new one.' };
+  }
+  const idx = state.users.findIndex(u => u.email === entry.email);
+  if (idx === -1) return { error: 'Account not found.' };
+  state.users[idx].password = newPassword;
+  localStorage.setItem('tempo_users', JSON.stringify(state.users));
+  delete resets[token];
+  localStorage.setItem('tempo_resets', JSON.stringify(resets));
+  return { ok: true };
+}
+
 function setCurrentUser(user) {
   state.currentUser = user;
   localStorage.setItem('tempo_current_user', JSON.stringify(user));
@@ -264,11 +303,11 @@ function setCurrentUser(user) {
 }
 
 function logout() {
-  state.currentUser   = null;
-  state.tasks         = [];
-  state.completed     = [];
-  state.view          = 'dashboard';
-  state.modal         = null;
+  state.currentUser = null;
+  state.tasks = [];
+  state.completed = [];
+  state.view = 'dashboard';
+  state.modal = null;
   state.notifPanelOpen = false;
   clearInterval(_notifInterval);
   localStorage.removeItem('tempo_current_user');
@@ -281,7 +320,7 @@ function logout() {
 
 function addTask(title, deadline, priority) {
   state.tasks.push({
-    id:        Date.now().toString(),
+    id: Date.now().toString(),
     title,
     deadline,
     priority,
@@ -344,9 +383,9 @@ function esc(str) {
 function timeAgo(iso) {
   const h = (new Date() - new Date(iso)) / 3600000;
   if (h < 0.017) return 'Just now';
-  if (h < 1)    return `${Math.floor(h * 60)}m ago`;
-  if (h < 24)   return `${Math.floor(h)}h ago`;
-  if (h < 48)   return 'Yesterday';
+  if (h < 1) return `${Math.floor(h * 60)}m ago`;
+  if (h < 24) return `${Math.floor(h)}h ago`;
+  if (h < 48) return 'Yesterday';
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -378,6 +417,10 @@ function renderToast() {
 // =========================================================
 
 function renderAuthScreen() {
+  if (state.authView === 'forgot') return renderForgotScreen();
+  if (state.authView === 'forgot-sent') return renderForgotSentScreen();
+  if (state.authView === 'reset') return renderResetScreen();
+
   const isLogin = state.activeAuthTab === 'login';
   return `
     <div class="auth-screen">
@@ -404,6 +447,72 @@ function renderAuthScreen() {
   `;
 }
 
+function renderForgotScreen() {
+  return `
+    <div class="auth-screen">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="auth-logo">🔑</div>
+          <h1>Forgot password?</h1>
+          <p>Enter your registered email and we'll send you a reset link.</p>
+        </div>
+        <div class="form-group">
+          <label for="inp-forgot-email">Email address</label>
+          <input type="email" id="inp-forgot-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <p class="error-msg" id="forgot-error"></p>
+        <button class="btn-primary" id="forgot-submit-btn" onclick="handleForgotPassword()">Send reset link</button>
+        <button class="btn-link" onclick="showAuthView('login')">← Back to login</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderForgotSentScreen() {
+  return `
+    <div class="auth-screen">
+      <div class="auth-card auth-card--success">
+        <div class="auth-success-icon">✉️</div>
+        <h2 class="auth-success-title">Check your inbox</h2>
+        <p class="auth-success-body">A password reset link has been sent to your email. It expires in 1 hour.</p>
+        <div class="auth-success-divider"></div>
+        <p class="auth-success-hint">Didn't get an email? Check your spam folder or
+          <button class="btn-inline-link" onclick="showAuthView('forgot')">try again</button>.
+        </p>
+        ${state.resetToken
+      ? `<button class="btn-primary" style="margin-top:20px" onclick="showAuthView('reset')">Set new password →</button>`
+      : ''}
+        <button class="btn-link" onclick="showAuthView('login')">← Back to login</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderResetScreen() {
+  return `
+    <div class="auth-screen">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="auth-logo">🔒</div>
+          <h1>Set new password</h1>
+          <p>Choose a strong password you haven't used before.</p>
+        </div>
+        <div class="form-group">
+          <label for="inp-new-password">New password</label>
+          <input type="password" id="inp-new-password" placeholder="Min 6 characters" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="inp-confirm-password">Confirm password</label>
+          <input type="password" id="inp-confirm-password" placeholder="Repeat your new password" autocomplete="new-password">
+        </div>
+        <p class="error-msg" id="reset-error"></p>
+        <button class="btn-primary" id="reset-submit-btn" onclick="handleResetPassword()">Update password</button>
+        <button class="btn-link" onclick="showAuthView('login')">← Back to login</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderLoginForm() {
   return `
     <div class="form-group">
@@ -415,6 +524,7 @@ function renderLoginForm() {
       <input type="password" id="inp-password" placeholder="••••••••" autocomplete="current-password">
     </div>
     <button class="btn-primary" id="auth-submit-btn" onclick="handleLogin()">Log in to Tempo</button>
+    <button class="btn-link" id="forgot-pwd-link" onclick="showAuthView('forgot')">Forgot password?</button>
   `;
 }
 
@@ -452,8 +562,8 @@ function renderAppShell() {
       ${renderNav(initials)}
       <main class="main-content">
         ${state.view === 'dashboard'
-          ? renderDashboard(sorted, topTask, urgentCount)
-          : renderCompleted()}
+      ? renderDashboard(sorted, topTask, urgentCount)
+      : renderCompleted()}
       </main>
     </div>
     ${state.modal ? renderModal() : ''}
@@ -474,7 +584,7 @@ function renderNav(initials) {
   const bellClass = hasOverdue
     ? 'notif-btn has-overdue'
     : badgeCount > 0 ? 'notif-btn has-notifs'
-    : 'notif-btn';
+      : 'notif-btn';
 
   const badgeHtml = badgeCount > 0
     ? `<span class="notif-badge">${badgeCount > 9 ? '9+' : badgeCount}</span>`
@@ -513,14 +623,14 @@ function renderNotifPanel() {
   const notifs = getNotifications();
   const permGranted = typeof Notification !== 'undefined'
     && Notification.permission === 'granted';
-  const permDenied  = typeof Notification !== 'undefined'
+  const permDenied = typeof Notification !== 'undefined'
     && Notification.permission === 'denied';
 
   const permHtml = permGranted
     ? `<span class="notif-perm-granted">✓ Alerts on</span>`
     : permDenied
-    ? `<span class="notif-perm-denied">Alerts blocked</span>`
-    : `<button class="notif-perm-btn" id="enable-alerts-btn" onclick="requestNotifPermission()">Enable alerts</button>`;
+      ? `<span class="notif-perm-denied">Alerts blocked</span>`
+      : `<button class="notif-perm-btn" id="enable-alerts-btn" onclick="requestNotifPermission()">Enable alerts</button>`;
 
   const itemsHtml = notifs.length === 0
     ? `<div class="notif-empty">
@@ -552,11 +662,11 @@ function renderNotifPanel() {
         <span>Browser alerts active — you'll be notified for overdue &amp; due-today tasks.</span>
       </div>`
     : permDenied
-    ? `<div class="notif-footer-status denied">
+      ? `<div class="notif-footer-status denied">
         <span class="notif-footer-icon">🚫</span>
         <span>Alerts blocked in browser settings. Allow notifications for this site to receive reminders.</span>
       </div>`
-    : `<div class="notif-footer-status pending">
+      : `<div class="notif-footer-status pending">
         <span class="notif-footer-icon">💡</span>
         <span>Enable browser alerts above to get real-time reminders for urgent tasks.</span>
       </div>`;
@@ -625,11 +735,11 @@ function renderDashboard(sorted, topTask, urgentCount) {
 // =========================================================
 
 function renderDoNextCard(task) {
-  const tier    = getUrgencyTier(task.deadline);
-  const reason  = getDoNextReason(task);
+  const tier = getUrgencyTier(task.deadline);
+  const reason = getDoNextReason(task);
   const dlLabel = getDeadlineLabel(task.deadline);
-  const score   = getScore(task).toFixed(1);
-  const pLabel  = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
+  const score = getScore(task).toFixed(1);
+  const pLabel = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
 
   return `
     <div class="do-next-card">
@@ -661,9 +771,9 @@ function renderDoNextEmpty() {
 // =========================================================
 
 function renderTaskCard(task) {
-  const tier    = getUrgencyTier(task.deadline);
+  const tier = getUrgencyTier(task.deadline);
   const dlLabel = getDeadlineLabel(task.deadline);
-  const score   = getScore(task).toFixed(1);
+  const score = getScore(task).toFixed(1);
 
   return `
     <div class="task-card tier-${tier}" id="task-card-${task.id}">
@@ -734,8 +844,8 @@ function renderCompleted() {
 
 function renderModal() {
   const isEdit = state.modal === 'edit';
-  const task   = isEdit ? state.tasks.find(t => t.id === state.editingTaskId) : null;
-  const today  = todayStr();
+  const task = isEdit ? state.tasks.find(t => t.id === state.editingTaskId) : null;
+  const today = todayStr();
 
   return `
     <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
@@ -763,7 +873,7 @@ function renderModal() {
         <div class="form-group">
           <label for="inp-task-priority">Priority</label>
           <select id="inp-task-priority">
-            <option value="high"   ${task?.priority === 'high'   ? 'selected' : ''}>High — must do this</option>
+            <option value="high"   ${task?.priority === 'high' ? 'selected' : ''}>High — must do this</option>
             <option value="medium" ${task?.priority === 'medium' ? 'selected' : ''}>Medium — should do this</option>
             <option value="low"    ${(!task || task.priority === 'low') ? 'selected' : ''}>Low — nice to do</option>
           </select>
@@ -807,6 +917,14 @@ function handleKeyDown(e) {
 }
 
 /* Auth */
+function showAuthView(view) {
+  state.authView = view;
+  if (view === 'login' || view === 'signup') {
+    state.activeAuthTab = view === 'signup' ? 'signup' : 'login';
+  }
+  render();
+}
+
 function switchAuthTab(tab) {
   state.activeAuthTab = tab;
   document.getElementById('tab-login').classList.toggle('active', tab === 'login');
@@ -817,7 +935,7 @@ function switchAuthTab(tab) {
 }
 
 function handleLogin() {
-  const email    = document.getElementById('inp-email')?.value.trim();
+  const email = document.getElementById('inp-email')?.value.trim();
   const password = document.getElementById('inp-password')?.value;
   if (!email || !password) {
     showAuthError('Please fill in all fields.');
@@ -825,13 +943,14 @@ function handleLogin() {
   }
   const { user, error } = authLogin(email, password);
   if (error) { showAuthError(error); return; }
+  state.authView = 'login';
   setCurrentUser(user);
   render();
 }
 
 function handleSignup() {
-  const name     = document.getElementById('inp-name')?.value.trim();
-  const email    = document.getElementById('inp-email')?.value.trim();
+  const name = document.getElementById('inp-name')?.value.trim();
+  const email = document.getElementById('inp-email')?.value.trim();
   const password = document.getElementById('inp-password')?.value;
   if (!name || !email || !password) {
     showAuthError('Please fill in all fields.');
@@ -843,8 +962,51 @@ function handleSignup() {
   }
   const { user, error } = authSignUp(name, email, password);
   if (error) { showAuthError(error); return; }
+  state.authView = 'login';
   setCurrentUser(user);
   render();
+}
+
+function handleForgotPassword() {
+  const email = document.getElementById('inp-forgot-email')?.value.trim();
+  if (!email) {
+    const el = document.getElementById('forgot-error');
+    if (el) el.textContent = 'Please enter your email address.';
+    return;
+  }
+  authForgotPassword(email);
+  showAuthView('forgot-sent');
+}
+
+function handleResetPassword() {
+  const newPwd = document.getElementById('inp-new-password')?.value;
+  const confirmPwd = document.getElementById('inp-confirm-password')?.value;
+  const errEl = document.getElementById('reset-error');
+
+  if (!newPwd || !confirmPwd) {
+    if (errEl) errEl.textContent = 'Please fill in both fields.';
+    return;
+  }
+  if (newPwd.length < 6) {
+    if (errEl) errEl.textContent = 'Password must be at least 6 characters.';
+    return;
+  }
+  if (newPwd !== confirmPwd) {
+    if (errEl) errEl.textContent = 'Passwords do not match.';
+    return;
+  }
+  if (!state.resetToken) {
+    if (errEl) errEl.textContent = 'Reset session expired. Please start over.';
+    return;
+  }
+  const { ok, error } = authResetPassword(state.resetToken, newPwd);
+  if (error) {
+    if (errEl) errEl.textContent = error;
+    return;
+  }
+  state.resetToken = null;
+  showToastVariant('Password updated! Please log in.', 'success');
+  showAuthView('login');
 }
 
 function showAuthError(msg) {
@@ -854,7 +1016,7 @@ function showAuthError(msg) {
 
 /* Modal */
 function openModal(type, taskId = null) {
-  state.modal         = type;
+  state.modal = type;
   state.editingTaskId = taskId;
   render();
   setTimeout(() => {
@@ -864,7 +1026,7 @@ function openModal(type, taskId = null) {
 }
 
 function closeModal() {
-  state.modal         = null;
+  state.modal = null;
   state.editingTaskId = null;
   render();
 }
@@ -874,7 +1036,7 @@ function handleOverlayClick(e) {
 }
 
 function handleSaveTask(editId) {
-  const title    = document.getElementById('inp-task-title')?.value.trim();
+  const title = document.getElementById('inp-task-title')?.value.trim();
   const deadline = document.getElementById('inp-task-deadline')?.value;
   const priority = document.getElementById('inp-task-priority')?.value;
 
@@ -888,7 +1050,7 @@ function handleSaveTask(editId) {
   }
 
   editId ? editTask(editId, title, deadline, priority)
-         : addTask(title, deadline, priority);
+    : addTask(title, deadline, priority);
 
   closeModal();
 }
@@ -925,6 +1087,11 @@ function startNotifInterval() {
 if (state.currentUser) {
   loadUserData();
   setTimeout(checkBrowserNotifications, 1500);
+  startNotifInterval();
+}
+
+render();
+
   startNotifInterval();
 }
 
